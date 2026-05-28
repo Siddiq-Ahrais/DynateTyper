@@ -1,43 +1,187 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="/src/styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
+    <title>DynateTyper — Key Management</title>
     <script type="module" src="/src/main.ts" defer></script>
   </head>
 
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
+    <div class="app-container">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="header-left">
+          <h1 class="app-title">
+            <span class="title-icon">⌨</span>
+            DynateTyper
+          </h1>
+          <span class="app-subtitle">Key Automation Manager</span>
+        </div>
+        <div class="header-right">
+          <div class="profile-section">
+            <label class="profile-label" for="profile-select">Profile:</label>
+            <select id="profile-select" class="profile-select"></select>
+            <button id="btn-create-profile" class="btn btn-ghost" title="Buat profile baru">
+              <span>＋</span>
+            </button>
+            <button id="btn-delete-profile" class="btn btn-ghost btn-danger-ghost" title="Hapus profile">
+              <span>🗑</span>
+            </button>
+          </div>
+        </div>
+      </header>
 
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/src/assets/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img
-            src="/src/assets/tauri.svg"
-            class="logo tauri"
-            alt="Tauri logo"
-          />
-        </a>
-        <a href="https://www.typescriptlang.org/docs" target="_blank">
-          <img
-            src="/src/assets/typescript.svg"
-            class="logo typescript"
-            alt="typescript logo"
-          />
-        </a>
+      <!-- Capture Section -->
+      <section class="capture-section">
+        <div class="capture-card">
+          <div class="capture-header">
+            <h2>Capture Key</h2>
+            <p class="capture-desc">Tekan tombol fisik untuk menangkap key. Support modifier combo (hingga 3 modifier + 1 key).</p>
+          </div>
+
+          <div class="capture-controls">
+            <button id="btn-capture" class="btn btn-primary btn-capture">
+              <span class="capture-icon">●</span>
+              <span id="capture-label">Mulai Capture</span>
+            </button>
+
+            <div id="captured-key-display" class="captured-key-display hidden">
+              <span class="captured-label">Key Tertangkap:</span>
+              <div id="captured-keys" class="key-badges"></div>
+            </div>
+          </div>
+
+          <!-- Add key form (shown after capture) -->
+          <div id="add-key-form" class="add-key-form hidden">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="input-interval">Interval (ms)</label>
+                <input type="number" id="input-interval" class="input-field" value="100" min="10" max="10000" />
+              </div>
+              <div class="form-group">
+                <label for="input-duration">Durasi (ms, 0 = ∞)</label>
+                <input type="number" id="input-duration" class="input-field" value="0" min="0" max="3600000" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button id="btn-add-key" class="btn btn-primary">Tambah Key</button>
+              <button id="btn-cancel-add" class="btn btn-ghost">Batal</button>
+            </div>
+          </div>
+
+          <!-- Conflict Warning -->
+          <div id="conflict-warning" class="conflict-warning hidden"></div>
+        </div>
+      </section>
+
+      <!-- Key Entries Table -->
+      <section class="entries-section">
+        <div class="entries-header">
+          <h2>Key Terdaftar</h2>
+          <div class="entries-meta">
+            <span id="entry-count" class="entry-count">0 / 20</span>
+            <button id="btn-clear-all" class="btn btn-ghost btn-danger-ghost">Clear All</button>
+          </div>
+        </div>
+
+        <div id="entries-list" class="entries-list">
+          <div id="empty-state" class="empty-state">
+            <span class="empty-icon">📋</span>
+            <p>Belum ada key yang didaftarkan.</p>
+            <p class="empty-hint">Gunakan tombol "Mulai Capture" untuk menambahkan key.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Security Settings -->
+      <section class="security-section">
+        <div class="security-card">
+          <div class="security-header">
+            <div class="security-title-row">
+              <span class="security-icon">🔒</span>
+              <h2>Keamanan</h2>
+            </div>
+          </div>
+
+          <div class="security-item">
+            <div class="security-info">
+              <span class="security-item-title">Enkripsi Config (AES-256)</span>
+              <span class="security-item-desc">Config file dienkripsi dengan AES-256-GCM. Kunci disimpan di OS keychain (Windows Credential Manager). Tidak butuh admin.</span>
+            </div>
+            <div class="toggle-wrapper">
+              <label class="toggle-switch" for="toggle-encryption">
+                <input type="checkbox" id="toggle-encryption" />
+                <span class="toggle-slider"></span>
+              </label>
+              <span id="encryption-status" class="security-status">Nonaktif</span>
+            </div>
+          </div>
+
+          <div id="encryption-feedback" class="encryption-feedback hidden"></div>
+        </div>
+      </section>
+
+      <!-- Edit Modal -->
+      <div id="edit-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <h3>Edit Key Entry</h3>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Key/Combo</label>
+              <div id="edit-key-display" class="key-badges"></div>
+              <button id="btn-recapture" class="btn btn-ghost btn-sm">Re-capture Key</button>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="edit-interval">Interval (ms)</label>
+                <input type="number" id="edit-interval" class="input-field" min="10" max="10000" />
+              </div>
+              <div class="form-group">
+                <label for="edit-duration">Durasi (ms, 0 = ∞)</label>
+                <input type="number" id="edit-duration" class="input-field" min="0" max="3600000" />
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button id="btn-save-edit" class="btn btn-primary">Simpan</button>
+            <button id="btn-cancel-edit" class="btn btn-ghost">Batal</button>
+          </div>
+        </div>
       </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
 
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
-    </main>
+      <!-- Confirm Modal -->
+      <div id="confirm-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-sm">
+          <h3 id="confirm-title">Konfirmasi</h3>
+          <p id="confirm-message"></p>
+          <div class="modal-actions">
+            <button id="btn-confirm-yes" class="btn btn-danger">Ya, Hapus</button>
+            <button id="btn-confirm-no" class="btn btn-ghost">Batal</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile Create Modal -->
+      <div id="profile-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-sm">
+          <h3>Buat Profile Baru</h3>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="new-profile-name">Nama Profile</label>
+              <input type="text" id="new-profile-name" class="input-field" placeholder="Nama profile..." maxlength="50" />
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button id="btn-save-profile" class="btn btn-primary">Buat</button>
+            <button id="btn-cancel-profile" class="btn btn-ghost">Batal</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
