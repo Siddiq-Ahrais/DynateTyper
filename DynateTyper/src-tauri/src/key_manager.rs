@@ -30,12 +30,12 @@ fn key_to_string(key: Key) -> String {
         Key::F11 => "F11".to_string(),
         Key::F12 => "F12".to_string(),
 
-        // Navigation
+        // Navigation & editing
         Key::Escape => "Esc".to_string(),
         Key::Return => "Enter".to_string(),
         Key::Tab => "Tab".to_string(),
         Key::Space => "Space".to_string(),
-        Key::BackSpace => "Backspace".to_string(),
+        Key::Backspace => "Backspace".to_string(),
         Key::Delete => "Delete".to_string(),
         Key::Home => "Home".to_string(),
         Key::End => "End".to_string(),
@@ -45,28 +45,42 @@ fn key_to_string(key: Key) -> String {
         Key::DownArrow => "Down".to_string(),
         Key::LeftArrow => "Left".to_string(),
         Key::RightArrow => "Right".to_string(),
+        Key::Insert => "Insert".to_string(),
 
-        // Special
+        // Toggle keys
         Key::CapsLock => "CapsLock".to_string(),
         Key::PrintScreen => "PrintScreen".to_string(),
         Key::ScrollLock => "ScrollLock".to_string(),
         Key::Pause => "Pause".to_string(),
-        Key::Insert => "Insert".to_string(),
         Key::NumLock => "NumLock".to_string(),
 
-        // Numpad
-        Key::Num0 => "Num0".to_string(),
-        Key::Num1 => "Num1".to_string(),
-        Key::Num2 => "Num2".to_string(),
-        Key::Num3 => "Num3".to_string(),
-        Key::Num4 => "Num4".to_string(),
-        Key::Num5 => "Num5".to_string(),
-        Key::Num6 => "Num6".to_string(),
-        Key::Num7 => "Num7".to_string(),
-        Key::Num8 => "Num8".to_string(),
-        Key::Num9 => "Num9".to_string(),
+        // Number row (top row 0-9)
+        Key::Num0 => "0".to_string(),
+        Key::Num1 => "1".to_string(),
+        Key::Num2 => "2".to_string(),
+        Key::Num3 => "3".to_string(),
+        Key::Num4 => "4".to_string(),
+        Key::Num5 => "5".to_string(),
+        Key::Num6 => "6".to_string(),
+        Key::Num7 => "7".to_string(),
+        Key::Num8 => "8".to_string(),
+        Key::Num9 => "9".to_string(),
 
-        // Alfanumerik — rdev::Key::KeyA, dll.
+        // Symbol keys
+        Key::BackQuote => "`".to_string(),
+        Key::Minus => "-".to_string(),
+        Key::Equal => "=".to_string(),
+        Key::LeftBracket => "[".to_string(),
+        Key::RightBracket => "]".to_string(),
+        Key::SemiColon => ";".to_string(),
+        Key::Quote => "'".to_string(),
+        Key::BackSlash => "\\".to_string(),
+        Key::IntlBackslash => "IntlBackslash".to_string(),
+        Key::Comma => ",".to_string(),
+        Key::Dot => ".".to_string(),
+        Key::Slash => "/".to_string(),
+
+        // Alfanumerik (A-Z)
         Key::KeyA => "A".to_string(),
         Key::KeyB => "B".to_string(),
         Key::KeyC => "C".to_string(),
@@ -94,14 +108,29 @@ fn key_to_string(key: Key) -> String {
         Key::KeyY => "Y".to_string(),
         Key::KeyZ => "Z".to_string(),
 
-        // Media keys
-        Key::VolumeUp => "VolumeUp".to_string(),
-        Key::VolumeDown => "VolumeDown".to_string(),
-        Key::VolumeMute => "VolumeMute".to_string(),
+        // Numpad (keypad)
+        Key::Kp0 => "Num0".to_string(),
+        Key::Kp1 => "Num1".to_string(),
+        Key::Kp2 => "Num2".to_string(),
+        Key::Kp3 => "Num3".to_string(),
+        Key::Kp4 => "Num4".to_string(),
+        Key::Kp5 => "Num5".to_string(),
+        Key::Kp6 => "Num6".to_string(),
+        Key::Kp7 => "Num7".to_string(),
+        Key::Kp8 => "Num8".to_string(),
+        Key::Kp9 => "Num9".to_string(),
+        Key::KpReturn => "NumEnter".to_string(),
+        Key::KpMinus => "Num-".to_string(),
+        Key::KpPlus => "Num+".to_string(),
+        Key::KpMultiply => "Num*".to_string(),
+        Key::KpDivide => "Num/".to_string(),
+        Key::KpDelete => "NumDel".to_string(),
+
+        // Misc
+        Key::Function => "Fn".to_string(),
 
         // Unknown — fallback
         Key::Unknown(code) => format!("Key({})", code),
-        _ => format!("{:?}", key),
     }
 }
 
