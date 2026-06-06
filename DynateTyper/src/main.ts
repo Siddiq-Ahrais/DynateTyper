@@ -164,14 +164,66 @@ async function stopCapture() {
 function updateCaptureUI() {
   const btn = $("btn-capture");
   const label = $("capture-label");
+  const vk = $("visual-keyboard");
 
   if (isCapturing) {
     btn.classList.add("capturing");
     label.textContent = "Stop Capture";
+    vk.classList.remove("hidden");
   } else {
     btn.classList.remove("capturing");
     label.textContent = "Mulai Capture";
+    vk.classList.add("hidden");
+    // Clear all active keys on visual keyboard
+    clearVisualKeyboard();
   }
+}
+
+function clearVisualKeyboard() {
+  document.querySelectorAll(".vk-key.active").forEach((el) => {
+    el.classList.remove("active");
+  });
+  // Clear all pending flash timeouts
+  keyFlashTimeouts.forEach((timeout) => clearTimeout(timeout));
+  keyFlashTimeouts.clear();
+}
+
+// Track flash timeouts per key to ensure minimum visibility
+const keyFlashTimeouts = new Map<string, number>();
+
+function highlightKey(keyName: string, active: boolean) {
+  // Find all matching keys (some keys like Shift/Ctrl appear twice)
+  const keys = document.querySelectorAll(
+    `.vk-key[data-key="${CSS.escape(keyName)}"]`
+  );
+
+  if (active) {
+    // Clear any pending release timeout for this key
+    const existing = keyFlashTimeouts.get(keyName);
+    if (existing) {
+      clearTimeout(existing);
+      keyFlashTimeouts.delete(keyName);
+    }
+    keys.forEach((el) => el.classList.add("active"));
+  } else {
+    // Delay removal to ensure minimum 150ms visibility
+    const timeout = window.setTimeout(() => {
+      keys.forEach((el) => el.classList.remove("active"));
+      keyFlashTimeouts.delete(keyName);
+    }, 150);
+    keyFlashTimeouts.set(keyName, timeout);
+  }
+}
+
+function initVisualKeyboard() {
+  // Tag modifier keys with a special class for green glow
+  const modifierNames = ["Ctrl", "Shift", "Alt", "AltGr", "Win"];
+  document.querySelectorAll(".vk-key").forEach((el) => {
+    const keyName = (el as HTMLElement).dataset.key;
+    if (keyName && modifierNames.includes(keyName)) {
+      el.classList.add("modifier-key");
+    }
+  });
 }
 
 function onKeyCaptured(keys: string[]) {
@@ -484,6 +536,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   await loadEntries();
   await loadEncryptionStatus();
 
+  // ─── Init Visual Keyboard ───
+  initVisualKeyboard();
+
   // ─── Key Capture Event from Rust ───
   await listen<string[]>("key-captured", (event) => {
     if (editCaptureMode) {
@@ -500,6 +555,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     } else {
       onKeyCaptured(event.payload);
     }
+  });
+
+  // ─── Visual Keyboard Events ───
+  await listen<string>("key-pressed", (event) => {
+    highlightKey(event.payload, true);
+  });
+
+  await listen<string>("key-released", (event) => {
+    highlightKey(event.payload, false);
   });
 
   // ─── Event Listeners ───

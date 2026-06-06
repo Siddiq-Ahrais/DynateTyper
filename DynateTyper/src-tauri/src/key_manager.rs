@@ -3,8 +3,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
-/// Flag global untuk menghentikan capture
+/// Flag global untuk mengaktifkan/menonaktifkan capture
 static CAPTURING: AtomicBool = AtomicBool::new(false);
+
+/// Flag untuk memastikan listener thread hanya di-spawn sekali
+static LISTENER_STARTED: AtomicBool = AtomicBool::new(false);
 
 /// Konversi rdev::Key ke nama string yang human-readable
 fn key_to_string(key: Key) -> String {
@@ -139,64 +142,82 @@ fn is_modifier(key_name: &str) -> bool {
     matches!(key_name, "Ctrl" | "Shift" | "Alt" | "AltGr" | "Win")
 }
 
-/// Mulai key capture di background thread.
-/// Emit event `key-captured` ke frontend setiap kali key ditekan.
-/// Payload: JSON array of key names (modifiers + key as chord).
+/// Mulai key capture.
+/// Listener thread di-spawn sekali saja dan tetap hidup selama aplikasi berjalan.
+/// Start/stop hanya toggle flag CAPTURING untuk mengaktifkan/menonaktifkan event emission.
 pub fn start_capture(app_handle: AppHandle) {
     CAPTURING.store(true, Ordering::SeqCst);
 
-    std::thread::spawn(move || {
-        let pressed_modifiers: Arc<parking_lot::Mutex<Vec<String>>> =
-            Arc::new(parking_lot::Mutex::new(Vec::new()));
+    // Hanya spawn listener thread sekali
+    if LISTENER_STARTED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        std::thread::spawn(move || {
+            let pressed_modifiers: Arc<parking_lot::Mutex<Vec<String>>> =
+                Arc::new(parking_lot::Mutex::new(Vec::new()));
 
-        let mods = pressed_modifiers.clone();
-        let app = app_handle.clone();
+            let mods = pressed_modifiers.clone();
+            let app = app_handle.clone();
 
-        let callback = move |event: Event| {
-            if !CAPTURING.load(Ordering::SeqCst) {
-                return;
-            }
+            let callback = move |event: Event| {
+                if !CAPTURING.load(Ordering::SeqCst) {
+                    // Saat tidak capturing, tetap clear modifiers agar tidak stale
+                    let mut m = mods.lock();
+                    m.clear();
+                    return;
+                }
 
-            match event.event_type {
-                EventType::KeyPress(key) => {
-                    let key_name = key_to_string(key);
+                match event.event_type {
+                    EventType::KeyPress(key) => {
+                        let key_name = key_to_string(key);
 
-                    if is_modifier(&key_name) {
-                        let mut m = mods.lock();
-                        if !m.contains(&key_name) {
-                            m.push(key_name);
+                        // Emit individual key press untuk visual keyboard
+                        let _ = app.emit("key-pressed", key_name.clone());
+
+                        if is_modifier(&key_name) {
+                            let mut m = mods.lock();
+                            if !m.contains(&key_name) {
+                                m.push(key_name);
+                            }
+                        } else {
+                            // Chord: modifiers + key
+                            let mut combo: Vec<String> = {
+                                let m = mods.lock();
+                                m.clone()
+                            };
+                            combo.push(key_name);
+
+                            // Emit ke frontend
+                            let _ = app.emit("key-captured", combo);
                         }
-                    } else {
-                        // Chord: modifiers + key
-                        let mut combo: Vec<String> = {
-                            let m = mods.lock();
-                            m.clone()
-                        };
-                        combo.push(key_name);
+                    }
+                    EventType::KeyRelease(key) => {
+                        let key_name = key_to_string(key);
 
-                        // Emit ke frontend
-                        let _ = app.emit("key-captured", combo);
+                        // Emit individual key release untuk visual keyboard
+                        let _ = app.emit("key-released", key_name.clone());
+
+                        if is_modifier(&key_name) {
+                            let mut m = mods.lock();
+                            m.retain(|k| k != &key_name);
+                        }
                     }
+                    _ => {}
                 }
-                EventType::KeyRelease(key) => {
-                    let key_name = key_to_string(key);
-                    if is_modifier(&key_name) {
-                        let mut m = mods.lock();
-                        m.retain(|k| k != &key_name);
-                    }
-                }
-                _ => {}
+            };
+
+            // rdev::listen blocks the thread forever — ini intentional
+            if let Err(e) = listen(callback) {
+                eprintln!("Error in rdev listener: {:?}", e);
+                // Reset flag agar bisa dicoba lagi jika listener gagal
+                LISTENER_STARTED.store(false, Ordering::SeqCst);
             }
-        };
-
-        // rdev::listen blocks the thread
-        if let Err(e) = listen(callback) {
-            eprintln!("Error in rdev listener: {:?}", e);
-        }
-    });
+        });
+    }
 }
 
-/// Stop key capture
+/// Stop key capture (hanya toggle flag, listener tetap hidup)
 pub fn stop_capture() {
     CAPTURING.store(false, Ordering::SeqCst);
 }
@@ -205,3 +226,4 @@ pub fn stop_capture() {
 pub fn is_capturing() -> bool {
     CAPTURING.load(Ordering::SeqCst)
 }
+

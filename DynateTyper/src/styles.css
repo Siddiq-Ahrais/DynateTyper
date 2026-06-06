@@ -905,3 +905,167 @@ body {
   background: var(--accent-glow-strong);
   color: var(--text-primary);
 }
+
+/* ─── Visual Keyboard ───────────────────────────────── */
+.visual-keyboard {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: rgba(13, 17, 23, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: vk-fade-in 300ms ease-out;
+  overflow-x: auto;
+}
+
+@keyframes vk-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vk-row {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.vk-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 6px;
+  background: linear-gradient(180deg, rgba(40, 48, 66, 0.9) 0%, rgba(28, 35, 51, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: default;
+  user-select: none;
+  transition: all 80ms ease;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Glow pseudo-element */
+.vk-key::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(99, 140, 255, 0.4) 0%, transparent 70%);
+  transition: opacity 80ms ease;
+  pointer-events: none;
+}
+
+/* ─── Active/Pressed State ──────────────────────────── */
+.vk-key.active {
+  background: linear-gradient(180deg, rgba(99, 140, 255, 0.35) 0%, rgba(124, 106, 255, 0.25) 100%);
+  border-color: rgba(99, 140, 255, 0.6);
+  border-bottom-color: rgba(99, 140, 255, 0.3);
+  color: #fff;
+  box-shadow:
+    0 0 12px rgba(99, 140, 255, 0.4),
+    0 0 30px rgba(99, 140, 255, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform: translateY(1px);
+  text-shadow: 0 0 8px rgba(99, 140, 255, 0.8);
+}
+
+.vk-key.active::after {
+  opacity: 1;
+}
+
+/* Modifier active — green glow */
+.vk-key.modifier-key.active {
+  background: linear-gradient(180deg, rgba(63, 185, 80, 0.3) 0%, rgba(46, 160, 67, 0.2) 100%);
+  border-color: rgba(63, 185, 80, 0.6);
+  border-bottom-color: rgba(63, 185, 80, 0.3);
+  box-shadow:
+    0 0 12px rgba(63, 185, 80, 0.4),
+    0 0 30px rgba(63, 185, 80, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  text-shadow: 0 0 8px rgba(63, 185, 80, 0.8);
+}
+
+.vk-key.modifier-key.active::after {
+  background: radial-gradient(ellipse at center, rgba(63, 185, 80, 0.4) 0%, transparent 70%);
+}
+
+/* ─── Key Size Variants ─────────────────────────────── */
+.vk-spacer {
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.vk-spacer-sm {
+  width: 10px;
+  flex-shrink: 0;
+}
+
+.vk-sm {
+  min-width: 30px;
+  font-size: 0.55rem;
+}
+
+.vk-wide {
+  min-width: 60px;
+}
+
+.vk-tab {
+  min-width: 52px;
+}
+
+.vk-caps {
+  min-width: 62px;
+}
+
+.vk-enter {
+  min-width: 72px;
+}
+
+.vk-shift-l {
+  min-width: 80px;
+}
+
+.vk-shift-r {
+  min-width: 80px;
+}
+
+.vk-ctrl {
+  min-width: 48px;
+}
+
+.vk-med {
+  min-width: 42px;
+}
+
+.vk-bslash {
+  min-width: 46px;
+}
+
+.vk-space {
+  flex: 1;
+  min-width: 160px;
+}
+
+/* ─── Keyboard hover (subtle) ───────────────────────── */
+.vk-key:hover:not(.active) {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
