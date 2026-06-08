@@ -224,10 +224,15 @@ pub fn delete_profile(state: State<'_, AppState>, name: String) -> Result<String
         return Err("Tidak bisa menghapus profile terakhir".to_string());
     }
 
-    // Tidak boleh hapus profile yang sedang aktif
+    // Jika menghapus profile aktif, auto-switch ke profile lain
     if config.active_profile == name {
-        return Err("Tidak bisa menghapus profile yang sedang aktif. Switch ke profile lain dulu."
-            .to_string());
+        let new_active = config
+            .profiles
+            .iter()
+            .find(|p| p.name != name)
+            .map(|p| p.name.clone())
+            .ok_or("Tidak ada profile lain untuk di-switch")?;
+        config.active_profile = new_active;
     }
 
     config.profiles.retain(|p| p.name != name);

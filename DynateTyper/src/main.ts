@@ -23,6 +23,17 @@ let confirmCallback: (() => void) | null = null;
 // Modifier keys constant
 const MODIFIERS = ["Ctrl", "Shift", "Alt", "AltGr", "Win"];
 
+// Global keyboard blocker — prevents browser from processing key events during capture
+// This is critical: without it, physical keyboard presses activate focused buttons
+// (e.g. Space/Enter on the capture button re-triggers toggleCapture and stops capture)
+function blockKeyboardEvent(e: KeyboardEvent) {
+  if (isCapturing || editCaptureMode) {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }
+}
+
 // ═══════════════════════════════════════════════════════
 // DOM Elements
 // ═══════════════════════════════════════════════════════
@@ -129,6 +140,10 @@ async function startCapture() {
     isCapturing = true;
     capturedKeys = [];
     updateCaptureUI();
+
+    // Remove focus from the capture button so physical key presses
+    // (especially Space/Enter) don't re-trigger the button click
+    (document.activeElement as HTMLElement)?.blur();
   } catch (e) {
     alert(e);
   }
@@ -205,6 +220,9 @@ function highlightKey(keyName: string, active: boolean) {
       keyFlashTimeouts.delete(keyName);
     }
     keys.forEach((el) => el.classList.add("active"));
+
+    // Show key pop-up animation
+    showKeyPopup(keyName);
   } else {
     // Delay removal to ensure minimum 150ms visibility
     const timeout = window.setTimeout(() => {
@@ -215,13 +233,87 @@ function highlightKey(keyName: string, active: boolean) {
   }
 }
 
+// ═══════════════════════════════════════════════════════
+// Key Pop-up Animation
+// ═══════════════════════════════════════════════════════
+function showKeyPopup(keyName: string) {
+  const container = document.getElementById("key-popup-container");
+  if (!container) return;
+
+  const popup = document.createElement("div");
+  popup.className = `key-popup ${MODIFIERS.includes(keyName) ? "modifier" : ""}`;
+  popup.textContent = keyName;
+
+  container.appendChild(popup);
+
+  // Remove after animation completes
+  popup.addEventListener("animationend", () => {
+    popup.remove();
+  });
+
+  // Fallback removal
+  setTimeout(() => {
+    if (popup.parentElement) popup.remove();
+  }, 1200);
+}
+
+// Track modifier keys pressed via visual keyboard clicks
+const vkPressedModifiers: Set<string> = new Set();
+
 function initVisualKeyboard() {
   // Tag modifier keys with a special class for green glow
   const modifierNames = ["Ctrl", "Shift", "Alt", "AltGr", "Win"];
   document.querySelectorAll(".vk-key").forEach((el) => {
-    const keyName = (el as HTMLElement).dataset.key;
+    const keyEl = el as HTMLElement;
+    const keyName = keyEl.dataset.key;
     if (keyName && modifierNames.includes(keyName)) {
       el.classList.add("modifier-key");
+    }
+
+    // ─── Click handler for visual keyboard keys ───
+    if (keyName) {
+      keyEl.style.cursor = "pointer";
+      keyEl.addEventListener("mousedown", (e) => {
+        e.preventDefault(); // Prevent focus loss
+        if (!isCapturing && !editCaptureMode) return; // Only respond during capture
+
+        if (MODIFIERS.includes(keyName)) {
+          // Toggle modifier
+          if (vkPressedModifiers.has(keyName)) {
+            vkPressedModifiers.delete(keyName);
+            highlightKey(keyName, false);
+          } else {
+            vkPressedModifiers.add(keyName);
+            highlightKey(keyName, true);
+          }
+        } else {
+          // Regular key: build combo from pressed modifiers + this key
+          highlightKey(keyName, true);
+
+          const combo: string[] = [...vkPressedModifiers, keyName];
+
+          // Emit the same event as physical keyboard capture
+          if (editCaptureMode) {
+            editCapturedKeys = combo;
+            renderKeyBadges(combo, $("edit-key-display"));
+            invoke("stop_key_capture").then(() => {
+              editCaptureMode = false;
+              ($("btn-recapture") as HTMLButtonElement).textContent = "Re-capture Key";
+              ($("btn-recapture") as HTMLButtonElement).classList.remove("capturing");
+            });
+          } else {
+            onKeyCaptured(combo);
+          }
+
+          // Release visual state after a short delay
+          setTimeout(() => {
+            highlightKey(keyName, false);
+            // Also release all modifiers
+            vkPressedModifiers.forEach((mod) => highlightKey(mod, false));
+            vkPressedModifiers.clear();
+          }, 200);
+        }
+      });
     }
   });
 }
@@ -440,6 +532,9 @@ async function startEditRecapture() {
     editCaptureMode = true;
     ($("btn-recapture") as HTMLButtonElement).textContent = "Tekan key...";
     ($("btn-recapture") as HTMLButtonElement).classList.add("capturing");
+
+    // Remove focus so physical keys don't trigger button clicks
+    (document.activeElement as HTMLElement)?.blur();
   } catch (e) {
     alert(e);
   }
@@ -539,6 +634,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   // ─── Init Visual Keyboard ───
   initVisualKeyboard();
 
+  // ─── Global keyboard blocker during capture mode ───
+  // Prevents physical key presses from interacting with DOM elements
+  // (buttons, inputs, etc.) while rdev captures them via the global hook.
+  // Without this, pressing Space/Enter while capture button is focused
+  // triggers toggleCapture() again, immediately stopping the capture.
+  document.addEventListener("keydown", blockKeyboardEvent, true);
+  document.addEventListener("keyup", blockKeyboardEvent, true);
+  document.addEventListener("keypress", blockKeyboardEvent, true);
+
   // ─── Key Capture Event from Rust ───
   await listen<string[]>("key-captured", (event) => {
     if (editCaptureMode) {
@@ -616,22 +720,28 @@ window.addEventListener("DOMContentLoaded", async () => {
   // Encryption toggle
   $("toggle-encryption").addEventListener("change", toggleEncryption);
 
-  // Confirm modal
-  $("btn-confirm-yes").addEventListener("click", () => {
+  // Confirm modal — use stopPropagation to prevent backdrop interference
+  $("btn-confirm-yes").addEventListener("click", (e) => {
+    e.stopPropagation();
     if (confirmCallback) {
-      confirmCallback();
+      const cb = confirmCallback;
       confirmCallback = null;
+      hideModal("confirm-modal");
+      cb();
+    } else {
+      hideModal("confirm-modal");
     }
-    hideModal("confirm-modal");
   });
-  $("btn-confirm-no").addEventListener("click", () => {
+  $("btn-confirm-no").addEventListener("click", (e) => {
+    e.stopPropagation();
     confirmCallback = null;
     hideModal("confirm-modal");
   });
 
   // Close modals by clicking backdrop
   document.querySelectorAll(".modal-backdrop").forEach((backdrop) => {
-    backdrop.addEventListener("click", () => {
+    backdrop.addEventListener("click", (e) => {
+      e.stopPropagation();
       const modal = backdrop.parentElement!;
       modal.classList.add("hidden");
 
@@ -643,6 +753,13 @@ window.addEventListener("DOMContentLoaded", async () => {
       editingEntryId = null;
       editCapturedKeys = null;
       confirmCallback = null;
+    });
+  });
+
+  // Prevent clicks inside modal-content from reaching backdrop
+  document.querySelectorAll(".modal-content").forEach((content) => {
+    content.addEventListener("click", (e) => {
+      e.stopPropagation();
     });
   });
 });
