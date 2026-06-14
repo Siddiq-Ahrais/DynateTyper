@@ -19,6 +19,8 @@ let capturedKeys: string[] = [];
 let editingEntryId: string | null = null;
 let editCapturedKeys: string[] | null = null;
 let confirmCallback: (() => void) | null = null;
+let confirmCancelCallback: (() => void) | null = null;
+let isRunning = false;
 
 // Modifier keys constant
 const MODIFIERS = ["Ctrl", "Shift", "Alt", "AltGr", "Win"];
@@ -561,35 +563,40 @@ async function toggleEncryption() {
   const toggle = $("toggle-encryption") as HTMLInputElement;
   const enable = toggle.checked;
 
-  // Konfirmasi sebelum toggle
-  const message = enable
-    ? "Aktifkan enkripsi AES-256 untuk config file? Kunci akan disimpan di OS keychain."
-    : "Nonaktifkan enkripsi config? File akan disimpan sebagai plain text dan kunci dihapus dari keychain.";
-
-  showConfirm(
-    enable ? "Aktifkan Enkripsi" : "Nonaktifkan Enkripsi",
-    message,
-    async () => {
-      try {
-        const result = await invoke<string>("toggle_encryption", { enable });
-        showEncryptionFeedback(result, "success");
-        await loadEncryptionStatus();
-      } catch (e) {
-        // Revert toggle on error
-        toggle.checked = !enable;
-        showEncryptionFeedback(String(e), "error");
-      }
+  if (enable) {
+    // Mengaktifkan enkripsi — langsung tanpa konfirmasi (aksi aman)
+    try {
+      const result = await invoke<string>("toggle_encryption", { enable });
+      showEncryptionFeedback(result, "success");
+      await loadEncryptionStatus();
+    } catch (e) {
+      toggle.checked = false;
+      showEncryptionFeedback(String(e), "error");
     }
-  );
+  } else {
+    // Menonaktifkan enkripsi — butuh konfirmasi dengan peringatan detail
+    // Set cancel callback — revert toggle jika user batal (No button ATAU klik backdrop)
+    confirmCancelCallback = () => {
+      toggle.checked = true;
+    };
 
-  // If user cancels confirm, revert toggle
-  const originalNo = $("btn-confirm-no").onclick;
-  $("btn-confirm-no").onclick = () => {
-    toggle.checked = !enable;
-    confirmCallback = null;
-    hideModal("confirm-modal");
-    $("btn-confirm-no").onclick = originalNo;
-  };
+    showConfirm(
+      "⚠️ Nonaktifkan Enkripsi?",
+      "Jika dimatikan, file config akan disimpan sebagai plain text yang bisa dibaca siapa saja yang mengakses komputer ini. " +
+        "Semua data key combo, interval, dan profile akan terlihat. " +
+        "Kunci enkripsi juga akan dihapus dari Windows Credential Manager.",
+      async () => {
+        try {
+          const result = await invoke<string>("toggle_encryption", { enable });
+          showEncryptionFeedback(result, "success");
+          await loadEncryptionStatus();
+        } catch (e) {
+          toggle.checked = true;
+          showEncryptionFeedback(String(e), "error");
+        }
+      }
+    );
+  }
 }
 
 function showEncryptionFeedback(message: string, type: "success" | "error") {
@@ -602,6 +609,49 @@ function showEncryptionFeedback(message: string, type: "success" | "error") {
   setTimeout(() => {
     el.classList.add("hidden");
   }, 5000);
+}
+
+// ═══════════════════════════════════════════════════════
+// Key Running (Auto-Type)
+// ═══════════════════════════════════════════════════════
+async function startRunning() {
+  try {
+    await invoke("run_key_entries");
+    // UI update is handled by the running-status event
+  } catch (e) {
+    alert(e);
+  }
+}
+
+async function stopRunning() {
+  try {
+    await invoke("stop_running");
+    // UI update is handled by the running-status event
+  } catch (e) {
+    alert(e);
+  }
+}
+
+function updateRunningUI() {
+  const btnRun = $("btn-run");
+  const btnStop = $("btn-stop");
+  const btnCapture = $("btn-capture") as HTMLButtonElement;
+  const btnClearAll = $("btn-clear-all") as HTMLButtonElement;
+
+  if (isRunning) {
+    btnRun.classList.add("hidden");
+    btnStop.classList.remove("hidden");
+    // Disable capture and clear during running
+    btnCapture.disabled = true;
+    btnCapture.classList.add("disabled");
+    btnClearAll.disabled = true;
+  } else {
+    btnRun.classList.remove("hidden");
+    btnStop.classList.add("hidden");
+    btnCapture.disabled = false;
+    btnCapture.classList.remove("disabled");
+    btnClearAll.disabled = false;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -657,7 +707,31 @@ window.addEventListener("DOMContentLoaded", async () => {
         ($("btn-recapture") as HTMLButtonElement).classList.remove("capturing");
       });
     } else {
+      // Set captured keys and display them
       onKeyCaptured(event.payload);
+
+      // Auto-stop capture after physical key combo is detected
+      invoke("stop_key_capture").then(async () => {
+        isCapturing = false;
+        updateCaptureUI();
+
+        // Show add form if keys were captured
+        if (capturedKeys.length > 0) {
+          $("add-key-form").classList.remove("hidden");
+
+          // Check conflict
+          const warning = await invoke<string | null>("check_key_conflict", {
+            keys: capturedKeys,
+          });
+          const warningEl = $("conflict-warning");
+          if (warning) {
+            warningEl.textContent = warning;
+            warningEl.classList.remove("hidden");
+          } else {
+            warningEl.classList.add("hidden");
+          }
+        }
+      });
     }
   });
 
@@ -670,6 +744,29 @@ window.addEventListener("DOMContentLoaded", async () => {
     highlightKey(event.payload, false);
   });
 
+  // ─── Running Status Event from Rust ───
+  await listen<string>("running-status", (event) => {
+    if (event.payload === "started") {
+      isRunning = true;
+    } else if (event.payload === "stopped") {
+      isRunning = false;
+    }
+    updateRunningUI();
+  });
+
+  // ─── Global Shortcuts from Rust (F6 = Run, F7 = Stop) ───
+  await listen<string>("shortcut-run", () => {
+    if (!isRunning && !isCapturing && !editCaptureMode) {
+      startRunning();
+    }
+  });
+
+  await listen<string>("shortcut-stop", () => {
+    if (isRunning) {
+      stopRunning();
+    }
+  });
+
   // ─── Event Listeners ───
 
   // Capture button
@@ -678,6 +775,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   // Add key
   $("btn-add-key").addEventListener("click", addKeyEntry);
   $("btn-cancel-add").addEventListener("click", cancelAdd);
+
+  // Run / Stop
+  $("btn-run").addEventListener("click", startRunning);
+  $("btn-stop").addEventListener("click", stopRunning);
 
   // Clear all
   $("btn-clear-all").addEventListener("click", clearAllEntries);
@@ -726,6 +827,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (confirmCallback) {
       const cb = confirmCallback;
       confirmCallback = null;
+      confirmCancelCallback = null; // User confirmed, don't revert
       hideModal("confirm-modal");
       cb();
     } else {
@@ -735,6 +837,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("btn-confirm-no").addEventListener("click", (e) => {
     e.stopPropagation();
     confirmCallback = null;
+    if (confirmCancelCallback) {
+      confirmCancelCallback();
+      confirmCancelCallback = null;
+    }
     hideModal("confirm-modal");
   });
 
@@ -753,6 +859,10 @@ window.addEventListener("DOMContentLoaded", async () => {
       editingEntryId = null;
       editCapturedKeys = null;
       confirmCallback = null;
+      if (confirmCancelCallback) {
+        confirmCancelCallback();
+        confirmCancelCallback = null;
+      }
     });
   });
 

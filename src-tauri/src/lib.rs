@@ -18,6 +18,12 @@ pub fn run() {
         .manage(AppState {
             config: Mutex::new(app_config),
         })
+        .setup(|app| {
+            // Inisialisasi global keyboard listener saat startup
+            // agar shortcut F6 (Run) dan F7 (Stop) langsung aktif
+            key_manager::init_listener(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Key capture
             commands::start_key_capture,
@@ -39,6 +45,9 @@ pub fn run() {
             // Encryption
             commands::toggle_encryption,
             commands::get_encryption_status,
+            // Key running (auto-type)
+            commands::run_key_entries,
+            commands::stop_running,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

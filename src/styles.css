@@ -252,6 +252,79 @@ body {
   font-size: 0.75rem;
 }
 
+.btn.disabled,
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ─── Run / Stop Buttons ────────────────────────────── */
+.btn-run {
+  background: linear-gradient(135deg, #3fb950 0%, #2ea043 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm), 0 0 15px rgba(63, 185, 80, 0.2);
+}
+
+.btn-run:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md), 0 0 25px rgba(63, 185, 80, 0.35);
+}
+
+.btn-run:active {
+  transform: translateY(0);
+}
+
+.run-icon {
+  font-size: 0.7rem;
+}
+
+.btn-stop {
+  background: linear-gradient(135deg, #f85149 0%, #da3633 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm), 0 0 15px rgba(248, 81, 73, 0.25);
+  animation: pulse-stop 1.5s ease-in-out infinite;
+}
+
+.btn-stop:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md), 0 0 30px rgba(248, 81, 73, 0.4);
+}
+
+.btn-stop:active {
+  transform: translateY(0);
+}
+
+.stop-icon {
+  font-size: 0.7rem;
+}
+
+@keyframes pulse-stop {
+  0%, 100% { box-shadow: var(--shadow-sm), 0 0 15px rgba(248, 81, 73, 0.25); }
+  50% { box-shadow: var(--shadow-sm), 0 0 30px rgba(248, 81, 73, 0.4), 0 0 50px rgba(248, 81, 73, 0.15); }
+}
+
+/* ─── Shortcut Badge ─────────────────────────────────── */
+.shortcut-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  margin-left: 2px;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+}
+
 /* ─── Capture Section ────────────────────────────────── */
 .capture-section {
   margin-bottom: var(--space-lg);

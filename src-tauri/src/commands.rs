@@ -1,5 +1,5 @@
 use parking_lot::Mutex;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
 use crate::config;
@@ -281,4 +281,38 @@ pub fn toggle_encryption(state: State<'_, AppState>, enable: bool) -> Result<Str
 pub fn get_encryption_status(state: State<'_, AppState>) -> Result<bool, String> {
     let config = state.config.lock();
     Ok(config.encrypt_config)
+}
+
+// ─── Key Running (Auto-Type) ────────────────────────────
+
+#[tauri::command]
+pub fn run_key_entries(
+    state: State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<String, String> {
+    if key_manager::is_running() {
+        return Err("Sudah sedang running".to_string());
+    }
+
+    let config = state.config.lock();
+    let profile = config
+        .active_profile()
+        .ok_or("Profile aktif tidak ditemukan")?;
+
+    if profile.entries.is_empty() {
+        return Err("Tidak ada key entries untuk dijalankan".to_string());
+    }
+
+    let entries = profile.entries.clone();
+    drop(config); // Release lock before spawning threads
+
+    key_manager::start_running(entries, app_handle);
+    Ok("Running dimulai".to_string())
+}
+
+#[tauri::command]
+pub fn stop_running(app_handle: AppHandle) -> Result<String, String> {
+    key_manager::stop_running();
+    let _ = app_handle.emit("running-status", "stopped");
+    Ok("Running dihentikan".to_string())
 }

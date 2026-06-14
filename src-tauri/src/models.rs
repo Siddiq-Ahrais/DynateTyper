@@ -31,18 +31,23 @@ pub struct Profile {
 pub struct AppConfig {
     /// Nama profile yang sedang aktif
     pub active_profile: String,
-    /// Apakah config file dienkripsi (optional, toggleable)
-    #[serde(default)]
+    /// Apakah config file dienkripsi (default: aktif)
+    #[serde(default = "default_encrypt")]
     pub encrypt_config: bool,
     /// Semua profiles
     pub profiles: Vec<Profile>,
+}
+
+/// Default value for encrypt_config serde deserialization
+fn default_encrypt() -> bool {
+    true
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             active_profile: "Default".to_string(),
-            encrypt_config: false,
+            encrypt_config: true,
             profiles: vec![Profile {
                 name: "Default".to_string(),
                 entries: Vec::new(),
